@@ -35,7 +35,7 @@ static const float PI = 3.14159265358;
 uniform float fFarPlane < source = "Far"; >;
 uniform float fNearPlane < source = "Near"; >;
 
-uniform float3 fCamPos < source = "position"; >;
+uniform float3 fCamPos < source = "Position"; >;
 
 uniform float4x4 fInvViewProjMatrix < source = "InvViewProjMatrix"; >;
 
