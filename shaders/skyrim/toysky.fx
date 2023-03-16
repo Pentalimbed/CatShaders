@@ -70,6 +70,13 @@ uniform float2 fSunDir <
     ui_step = 0.1;
 > = float2(0, 45);
 
+uniform float3 fSunColor <
+	ui_type = "color";
+    ui_label = "Sun Color";
+    ui_category = "World";
+> = float3(1, 1, 1);
+
+
 uniform float3 fRayleighScatterCoeff <
 	ui_type = "color";
     ui_label = "Rayleigh Scattering Color";
@@ -116,6 +123,7 @@ uniform float fOzoneAbsorpScale <
     ui_category = "Atmosphere";
     ui_step = 0.01;
 > = 1.99;
+
 
 uniform int iSunTransmittanceStep <
 	ui_type = "slider";
@@ -241,7 +249,7 @@ float3 getSunTransmittance(float3 pos, float3 sun_dir)
     float atmos_dist = rayIntersectSphere(pos, sun_dir, fGroundRadiusMM + fAtmosThicknessMM);
 
     float t = 0.0;
-    float3 transmittance = 1;
+    float3 transmittance = fSunColor;
     for(int i = 0; i < iSunTransmittanceStep; ++i)
     {
         float new_t = (i + 0.3) / iSunTransmittanceStep * atmos_dist;
@@ -297,7 +305,7 @@ void getMultiScatterValues(
             float mie_phase = getMiePhase(cos_theta);
             float rayleigh_phase = getRayleighPhase(-cos_theta);
 
-            float3 lum = 0, lum_factor = 0, transmittance = 1;
+            float3 lum = 0, lum_factor = 0, transmittance = fSunColor;
             float t = 0;
             for(float step = 0; step < iMultiscatterStep; ++step)
             {
@@ -370,7 +378,7 @@ float3 raymarchScatter(float3 pos, float3 ray_dir, float3 sun_dir, float t_max)
     float mie_phase = getMiePhase(cos_theta);
     float rayleigh_phase = getRayleighPhase(-cos_theta);
 
-    float3 lum = 0, transmittance = 1;
+    float3 lum = 0, transmittance = fSunColor;
     float t = 0;
     for(int i = 0; i < iSkyScatterStep; ++i)
     {
@@ -398,13 +406,6 @@ float3 raymarchScatter(float3 pos, float3 ray_dir, float3 sun_dir, float t_max)
         transmittance *= sample_transmittance;
     }
     return lum;
-}
-
-float3 jodieReinhardTonemap(float3 c){
-    // From: https://www.shadertoy.com/view/tdSXzD
-    float l = dot(c, float3(0.2126, 0.7152, 0.0722));
-    float3 tc = c / (c + 1.0);
-    return lerp(c / (l + 1.0), tc, tc);
 }
 
 void PS_Skyview(
@@ -435,6 +436,26 @@ void PS_Skyview(
     color = float4(lum, 1);
 }
 
+// -------------- Display -------------- //
+
+float3 jodieReinhardTonemap(float3 c){
+    // From: https://www.shadertoy.com/view/tdSXzD
+    float l = dot(c, float3(0.2126, 0.7152, 0.0722));
+    float3 tc = c / (c + 1.0);
+    return lerp(c / (l + 1.0), tc, tc);
+}
+
+void PS_Display(
+    in float4 vpos : SV_Position, in float2 uv : TEXCOORD0,
+    out float4 color : SV_Target0)
+{
+    color = tex2D(ReShade::BackBuffer, uv);
+
+    float4 cam_pos = mul(transpose(fInvViewProjMatrix), float4(0, 0, 0, 1));
+    cam_pos /= cam_pos.w;
+    color = fCamPos != 0;
+}
+
 technique PhysicalSky
 {
     pass
@@ -454,5 +475,10 @@ technique PhysicalSky
         VertexShader = PostProcessVS;
         PixelShader = PS_Skyview;
         RenderTarget0 = tex_sky_lut;
+    }
+    pass
+    {
+        VertexShader = PostProcessVS;
+        PixelShader = PS_Display;
     }
 }
