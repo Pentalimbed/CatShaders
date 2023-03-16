@@ -476,9 +476,9 @@ technique PhysicalSky
         PixelShader = PS_Skyview;
         RenderTarget0 = tex_sky_lut;
     }
-    pass
-    {
-        VertexShader = PostProcessVS;
-        PixelShader = PS_Display;
-    }
+    // pass
+    // {
+    //     VertexShader = PostProcessVS;
+    //     PixelShader = PS_Display;
+    // }
 }
