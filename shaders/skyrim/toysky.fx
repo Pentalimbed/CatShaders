@@ -1,3 +1,6 @@
+// TODO:
+// - Debanding
+
 // src: https://www.shadertoy.com/view/fd2fWc
 // src fr: https://github.com/sebh/UnrealEngineSkyAtmosphere
 
@@ -236,7 +239,7 @@ float getMiePhase(float cosTheta) {
     const float scale = 3.0/(8.0*PI);
     
     float num = (1.0-g*g)*(1.0+cosTheta*cosTheta);
-    float denom = (2.0+g*g)*pow((1.0 + g*g - 2.0*g*cosTheta), 1.5);
+    float denom = (2.0+g*g)*pow(abs(1.0 + g*g - 2.0*g*cosTheta), 1.5);
     
     return scale*num/denom;
 }
@@ -480,15 +483,16 @@ void PS_Display(
     in float4 vpos : SV_Position, in float2 uv : TEXCOORD0,
     out float3 color : SV_Target0)
 {
-    float3 view_pos = float3(0, 0.0002 + fGroundRadiusMM, 0);
+    float3 view_pos = float3(0, 0.00002 + fGroundRadiusMM, 0);
     float3 ray = screenToWorld(uv, tex2D(Skyrim::samp_depth, uv).x) - fCamPos;
     float3 ray_dir = normalize(ray).xzy;
     float3 sun_dir = getSphericalDir(radians(fSunDir.x), radians(fSunDir.y));
 
-    // float ground_dist = rayIntersectSphere(view_pos, ray_dir, fGroundRadiusMM);
     float ground_dist = length(ray);
     // should be e-8 (according to creation kit wiki) but world of skyrim is too small for scattering to kick in
-    ground_dist = ground_dist > 150000 ? -1.0 : ground_dist * 1.428e-7;
+    ground_dist = ground_dist > 150000 ? 
+        rayIntersectSphere(view_pos, ray_dir, fGroundRadiusMM) : 
+        ground_dist * 1.428e-7;
     float atmos_dist = rayIntersectSphere(view_pos, ray_dir, fGroundRadiusMM + fAtmosThicknessMM);
     float t_max = ground_dist > 0.0 ? ground_dist : atmos_dist;
 
