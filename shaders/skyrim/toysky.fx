@@ -479,6 +479,7 @@ void PS_Display(
 
     // float ground_dist = rayIntersectSphere(view_pos, ray_dir, fGroundRadiusMM);
     float ground_dist = length(ray);
+    // should be e-8 (according to creation kit wiki) but world of skyrim is too small for scattering to kick in
     ground_dist = ground_dist > 150000 ? -1.0 : ground_dist * 1.428e-7;
     float atmos_dist = rayIntersectSphere(view_pos, ray_dir, fGroundRadiusMM + fAtmosThicknessMM);
     float t_max = ground_dist > 0.0 ? ground_dist : atmos_dist;
