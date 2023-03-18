@@ -76,6 +76,14 @@ uniform float3 fSunColor <
     ui_category = "World";
 > = float3(1, 1, 1);
 
+uniform float fSunIntensity <
+	ui_type = "slider";
+    ui_label = "Sun Intensity";
+    ui_category = "World";
+    ui_min = 0; ui_max = 2.0;
+    ui_step = 0.01;
+> = 1.0;
+
 
 uniform float3 fRayleighScatterCoeff <
 	ui_type = "color";
@@ -249,7 +257,7 @@ float3 getSunTransmittance(float3 pos, float3 sun_dir)
     float atmos_dist = rayIntersectSphere(pos, sun_dir, fGroundRadiusMM + fAtmosThicknessMM);
 
     float t = 0.0;
-    float3 transmittance = fSunColor;
+    float3 transmittance = fSunColor * fSunIntensity;
     for(int i = 0; i < iSunTransmittanceStep; ++i)
     {
         float new_t = (i + 0.3) / iSunTransmittanceStep * atmos_dist;
@@ -305,7 +313,7 @@ void getMultiScatterValues(
             float mie_phase = getMiePhase(cos_theta);
             float rayleigh_phase = getRayleighPhase(-cos_theta);
 
-            float3 lum = 0, lum_factor = 0, transmittance = fSunColor;
+            float3 lum = 0, lum_factor = 0, transmittance = fSunColor * fSunIntensity;
             float t = 0;
             for(float step = 0; step < iMultiscatterStep; ++step)
             {
@@ -378,7 +386,7 @@ float3 raymarchScatter(float3 pos, float3 ray_dir, float3 sun_dir, float t_max)
     float mie_phase = getMiePhase(cos_theta);
     float rayleigh_phase = getRayleighPhase(-cos_theta);
 
-    float3 lum = 0, transmittance = fSunColor;
+    float3 lum = 0, transmittance = fSunColor * fSunIntensity;
     float t = 0;
     for(int i = 0; i < iSkyScatterStep; ++i)
     {
@@ -438,22 +446,50 @@ void PS_Skyview(
 
 // -------------- Display -------------- //
 
-float3 jodieReinhardTonemap(float3 c){
-    // From: https://www.shadertoy.com/view/tdSXzD
-    float l = dot(c, float3(0.2126, 0.7152, 0.0722));
-    float3 tc = c / (c + 1.0);
-    return lerp(c / (l + 1.0), tc, tc);
+float3 screenToWorld(float2 uv, float raw_z)
+{
+    float4 pos_s = float4(uv * 2 - 1, 1, 1);
+    pos_s.y = -pos_s.y;
+    pos_s.xyz *= raw_z;
+    float4 pos = mul(transpose(fInvViewProjMatrix), pos_s);
+    return pos.xyz / pos.w;
+}
+
+float3 sunWithBloom(float3 rayDir, float3 sunDir) {
+    const float sunSolidAngle = 0.53*PI/180.0;
+    const float minSunCosTheta = cos(sunSolidAngle);
+
+    float cosTheta = dot(rayDir, sunDir);
+    if (cosTheta >= minSunCosTheta) return 1.0;
+    
+    float offset = minSunCosTheta - cosTheta;
+    float gaussianBloom = exp(-offset*50000.0)*0.5;
+    float invBloom = 1.0/(0.02 + offset*300.0)*0.01;
+    return gaussianBloom+invBloom;
 }
 
 void PS_Display(
     in float4 vpos : SV_Position, in float2 uv : TEXCOORD0,
-    out float4 color : SV_Target0)
+    out float3 color : SV_Target0)
 {
-    color = tex2D(ReShade::BackBuffer, uv);
+    float3 view_pos = float3(0, 0.0002 + fGroundRadiusMM, 0);
+    float3 ray = screenToWorld(uv, tex2D(Skyrim::samp_depth, uv).x) - fCamPos;
+    float3 ray_dir = normalize(ray).xzy;
+    float3 sun_dir = getSphericalDir(radians(fSunDir.x), radians(fSunDir.y));
 
-    float4 cam_pos = mul(transpose(fInvViewProjMatrix), float4(0, 0, 0, 1));
-    cam_pos /= cam_pos.w;
-    color = fCamPos != 0;
+    // float ground_dist = rayIntersectSphere(view_pos, ray_dir, fGroundRadiusMM);
+    float ground_dist = length(ray);
+    ground_dist = ground_dist > 150000 ? -1.0 : ground_dist * 1.428e-7;
+    float atmos_dist = rayIntersectSphere(view_pos, ray_dir, fGroundRadiusMM + fAtmosThicknessMM);
+    float t_max = ground_dist > 0.0 ? ground_dist : atmos_dist;
+
+    float3 lum = raymarchScatter(view_pos, ray_dir, sun_dir, t_max);
+
+    float3 sunLum = sunWithBloom(ray_dir, sun_dir);
+    lum += sunLum;
+
+    color = ground_dist < 0.0 ? lum : tex2D(ReShade::BackBuffer, uv).rgb + lum;
+    // color = lum;
 }
 
 technique PhysicalSky
@@ -476,9 +512,9 @@ technique PhysicalSky
         PixelShader = PS_Skyview;
         RenderTarget0 = tex_sky_lut;
     }
-    // pass
-    // {
-    //     VertexShader = PostProcessVS;
-    //     PixelShader = PS_Display;
-    // }
+    pass
+    {
+        VertexShader = PostProcessVS;
+        PixelShader = PS_Display;
+    }
 }
