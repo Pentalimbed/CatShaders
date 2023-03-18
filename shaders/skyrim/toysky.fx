@@ -84,6 +84,14 @@ uniform float fSunIntensity <
     ui_step = 0.01;
 > = 1.0;
 
+uniform float fBlendIntensity <
+	ui_type = "slider";
+    ui_label = "Blend Intensity";
+    ui_category = "World";
+    ui_min = 0; ui_max = 2.0;
+    ui_step = 0.01;
+> = 1.0;
+
 
 uniform float3 fRayleighScatterCoeff <
 	ui_type = "color";
@@ -488,6 +496,7 @@ void PS_Display(
 
     float3 sunLum = sunWithBloom(ray_dir, sun_dir);
     lum += sunLum;
+    lum *= fBlendIntensity;
 
     color = ground_dist < 0.0 ? lum : tex2D(ReShade::BackBuffer, uv).rgb + lum;
     // color = lum;
@@ -507,12 +516,12 @@ technique PhysicalSky
         PixelShader = PS_Multiscatter;
         RenderTarget0 = tex_multiscatter_lut;
     }
-    pass
-    {
-        VertexShader = PostProcessVS;
-        PixelShader = PS_Skyview;
-        RenderTarget0 = tex_sky_lut;
-    }
+    // pass
+    // {
+    //     VertexShader = PostProcessVS;
+    //     PixelShader = PS_Skyview;
+    //     RenderTarget0 = tex_sky_lut;
+    // }
     pass
     {
         VertexShader = PostProcessVS;
