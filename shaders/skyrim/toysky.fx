@@ -43,6 +43,14 @@ uniform float3 fCamPos < source = "Position"; >;
 uniform float4x4 fInvViewProjMatrix < source = "InvViewProjMatrix"; >;
 
 
+uniform float fGroundHeight <
+	ui_type = "slider";
+    ui_label = "World Ground Height (1000 Skyrim Unit)";
+    ui_category = "World";
+    ui_min = -100.0; ui_max = 0.0;
+    ui_step = 1.0;
+> = -1;
+
 uniform float fGroundRadiusMM <
 	ui_type = "slider";
     ui_label = "Ground Radius (megameter)";
@@ -483,27 +491,33 @@ void PS_Display(
     in float4 vpos : SV_Position, in float2 uv : TEXCOORD0,
     out float3 color : SV_Target0)
 {
-    float3 view_pos = float3(0, 0.00002 + fGroundRadiusMM, 0);
+    float3 view_pos = float3(0, (fCamPos.z - fGroundHeight * 1e3) * 1.428e-7 + fGroundRadiusMM, 0);
     float3 ray = screenToWorld(uv, tex2D(Skyrim::samp_depth, uv).x) - fCamPos;
     float3 ray_dir = normalize(ray).xzy;
     float3 sun_dir = getSphericalDir(radians(fSunDir.x), radians(fSunDir.y));
 
     float ground_dist = length(ray);
     // should be e-8 (according to creation kit wiki) but world of skyrim is too small for scattering to kick in
-    ground_dist = ground_dist > 150000 ? 
+    ground_dist = ground_dist > 300000 ? 
         rayIntersectSphere(view_pos, ray_dir, fGroundRadiusMM) : 
-        ground_dist * 1.428e-7;
+        ground_dist * 1.428e-8 * 10;
     float atmos_dist = rayIntersectSphere(view_pos, ray_dir, fGroundRadiusMM + fAtmosThicknessMM);
     float t_max = ground_dist > 0.0 ? ground_dist : atmos_dist;
 
-    float3 lum = raymarchScatter(view_pos, ray_dir, sun_dir, t_max);
+    [branch]
+    if(!isinf(t_max) && !isnan(t_max))
+    {
+        float3 lum = raymarchScatter(view_pos, ray_dir, sun_dir, t_max);
 
-    float3 sunLum = sunWithBloom(ray_dir, sun_dir);
-    lum += sunLum;
-    lum *= fBlendIntensity;
+        float3 sunLum = sunWithBloom(ray_dir, sun_dir);
+        lum += sunLum;
+        lum *= fBlendIntensity;
 
-    color = ground_dist < 0.0 ? lum : tex2D(ReShade::BackBuffer, uv).rgb + lum;
-    // color = lum;
+        color = ground_dist < 0.0 ? lum : tex2D(ReShade::BackBuffer, uv).rgb + lum;
+        // color = lum;
+    }
+    else
+        tex2D(ReShade::BackBuffer, uv).rgb;
 }
 
 technique PhysicalSky
