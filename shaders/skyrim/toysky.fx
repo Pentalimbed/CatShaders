@@ -115,7 +115,7 @@ uniform float fRayleighScatterScale <
     ui_label = "Rayleigh Scattering Scale";
     ui_category = "Atmosphere";
     ui_step = 0.01;
-> = 36.24;
+> = 100;
 
 uniform float fRayleighAbsorpScale <
 	ui_type = "input";
@@ -491,7 +491,14 @@ void PS_Display(
     in float4 vpos : SV_Position, in float2 uv : TEXCOORD0,
     out float3 color : SV_Target0)
 {
-    float3 view_pos = float3(0, (fCamPos.z - fGroundHeight * 1e3) * 1.428e-7 + fGroundRadiusMM, 0);
+    color = tex2D(ReShade::BackBuffer, uv).rgb;
+
+    float3 view_pos = float3(0, (fCamPos.z - fGroundHeight * 1e3) * 1.428e-8 + fGroundRadiusMM, 0);
+
+    [branch]
+    if((view_pos.y < fGroundRadiusMM) || (view_pos.y > fGroundRadiusMM + fAtmosThicknessMM))
+        return;
+
     float3 ray = screenToWorld(uv, tex2D(Skyrim::samp_depth, uv).x) - fCamPos;
     float3 ray_dir = normalize(ray).xzy;
     float3 sun_dir = getSphericalDir(radians(fSunDir.x), radians(fSunDir.y));
@@ -513,7 +520,7 @@ void PS_Display(
         lum += sunLum;
         lum *= fBlendIntensity;
 
-        color = ground_dist < 0.0 ? lum : tex2D(ReShade::BackBuffer, uv).rgb + lum;
+        color = ground_dist < 0.0 ? lum : (color + lum);
         // color = lum;
     }
     else
