@@ -2,7 +2,7 @@
 // - Debanding
 
 // src: https://www.shadertoy.com/view/fd2fWc
-// src fr: https://github.com/sebh/UnrealEngineSkyAtmosphere
+// algo: https://github.com/sebh/UnrealEngineSkyAtmosphere
 
 #include "ReShade.fxh"
 
@@ -91,7 +91,7 @@ uniform float fSunIntensity <
 	ui_type = "slider";
     ui_label = "Sun Intensity";
     ui_category = "World";
-    ui_min = 0; ui_max = 2.0;
+    ui_min = 0; ui_max = 10.0;
     ui_step = 0.01;
 > = 1.0;
 
@@ -115,7 +115,7 @@ uniform float fRayleighScatterScale <
     ui_label = "Rayleigh Scattering Scale";
     ui_category = "Atmosphere";
     ui_step = 0.01;
-> = 100;
+> = 36.24;
 
 uniform float fRayleighAbsorpScale <
 	ui_type = "input";
@@ -276,7 +276,7 @@ float3 getSunTransmittance(float3 pos, float3 sun_dir)
     float atmos_dist = rayIntersectSphere(pos, sun_dir, fGroundRadiusMM + fAtmosThicknessMM);
 
     float t = 0.0;
-    float3 transmittance = fSunColor * fSunIntensity;
+    float3 transmittance = 1;
     for(int i = 0; i < iSunTransmittanceStep; ++i)
     {
         float new_t = (i + 0.3) / iSunTransmittanceStep * atmos_dist;
@@ -332,7 +332,7 @@ void getMultiScatterValues(
             float mie_phase = getMiePhase(cos_theta);
             float rayleigh_phase = getRayleighPhase(-cos_theta);
 
-            float3 lum = 0, lum_factor = 0, transmittance = fSunColor * fSunIntensity;
+            float3 lum = 0, lum_factor = 0, transmittance = 1;
             float t = 0;
             for(float step = 0; step < iMultiscatterStep; ++step)
             {
@@ -429,7 +429,7 @@ float3 raymarchScatter(float3 pos, float3 ray_dir, float3 sun_dir, float t_max)
 
         float3 scatter_integeral = in_scatter * (1 - sample_transmittance) / extinction;
 
-        lum += scatter_integeral * sample_transmittance;
+        lum += scatter_integeral * transmittance;
         transmittance *= sample_transmittance;
     }
     return lum;
@@ -484,7 +484,7 @@ float3 sunWithBloom(float3 rayDir, float3 sunDir) {
     float offset = minSunCosTheta - cosTheta;
     float gaussianBloom = exp(-offset*50000.0)*0.5;
     float invBloom = 1.0/(0.02 + offset*300.0)*0.01;
-    return gaussianBloom+invBloom;
+    return gaussianBloom + invBloom * fSunColor;
 }
 
 void PS_Display(
