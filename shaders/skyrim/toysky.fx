@@ -38,7 +38,7 @@ static const float PI = 3.14159265358;
 uniform float fFarPlane < source = "Far"; >;
 uniform float fNearPlane < source = "Near"; >;
 
-uniform float3 fCamPos < source = "Position"; >;
+uniform float3 fCamPos < source = "EyePosition"; >;
 
 uniform float4x4 fInvViewProjMatrix < source = "InvViewProjMatrix"; >;
 
@@ -191,13 +191,13 @@ texture tex_depth : TARGET_MAIN_DEPTH;
 sampler samp_depth { Texture = tex_depth; };
 }
 
-texture tex_transmittance_lut {Width = TRANSMITTANCE_LUT_WIDTH; Height = TRANSMITTANCE_LUT_HEIGHT; Format = RGBA16F;};
+texture tex_transmittance_lut {Width = TRANSMITTANCE_LUT_WIDTH; Height = TRANSMITTANCE_LUT_HEIGHT; Format = RGBA32F;};
 sampler samp_transmittance_lut {Texture = tex_transmittance_lut;};
 
-texture tex_multiscatter_lut {Width = MULTISCATTER_LUT_WIDTH; Height = MULTISCATTER_LUT_HEIGHT; Format = RGBA16F;};
+texture tex_multiscatter_lut {Width = MULTISCATTER_LUT_WIDTH; Height = MULTISCATTER_LUT_HEIGHT; Format = RGBA32F;};
 sampler samp_multiscatter_lut {Texture = tex_multiscatter_lut;};
 
-texture tex_sky_lut {Width = SKY_LUT_WIDTH; Height = SKY_LUT_HEIGHT; Format = RGBA16F;};
+texture tex_sky_lut {Width = SKY_LUT_WIDTH; Height = SKY_LUT_HEIGHT; Format = RGBA32F;};
 sampler samp_sky_lut {Texture = tex_sky_lut;};
 
 
@@ -470,7 +470,7 @@ float3 screenToWorld(float2 uv, float raw_z)
     float4 pos_s = float4(uv * 2 - 1, 1, 1);
     pos_s.y = -pos_s.y;
     pos_s.xyz *= raw_z;
-    float4 pos = mul(transpose(fInvViewProjMatrix), pos_s);
+    float4 pos = mul(fInvViewProjMatrix, pos_s);
     return pos.xyz / pos.w;
 }
 
