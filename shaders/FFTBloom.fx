@@ -24,9 +24,9 @@ uniform float fBrightnessThres <
 
 uniform float fMixStrength <
     ui_type = "slider";
-    ui_min = 0.0; ui_max = 2.0;
+    ui_min = 0.0; ui_max = 10.0;
     ui_step = 0.01;
-> = 1.0;
+> = 4.0;
 
 texture2D tex_color_scaled {Width = FFT_TEX_SIZE << 1; Height = FFT_TEX_SIZE; Format = RGBA16F;};
 storage2D st_color_scaled  {Texture = tex_color_scaled; MipLevel = 0;};
