@@ -7,7 +7,7 @@ uniform float fLumaThres <
     ui_type = "slider";
     ui_min = 0.0; ui_max = 1.5;
     ui_step = 0.01;
-> = 0.7;
+> = 0.3;
 
 uniform float fUpsampleBlurRadius <
     ui_label = "Upsample Blur Radius";
@@ -28,7 +28,7 @@ uniform float BLURMIX(N) <      \
     ui_type = "slider";         \
     ui_min = 0.0; ui_max = 2.0; \
     ui_step = 0.01;             \
-> = 1.0;                        \
+> = 1 / float(8 - N);           \
 texture2D BLURTEX(N)    {Width = BUFFER_WIDTH >> N; Height = BUFFER_HEIGHT >> N; Format = RGBA16F;}; \
 sampler2D BLURSAMP(N)   {Texture = BLURTEX(N);};                                                     \
 texture2D BLURUPTEX(N)  {Width = BUFFER_WIDTH >> N; Height = BUFFER_HEIGHT >> N; Format = RGBA16F;}; \
@@ -39,7 +39,7 @@ uniform float fBloomMix <
     ui_type = "slider";         
     ui_min = 0.0; ui_max = 2.0; 
     ui_step = 0.01;             
-> = 1.0;  
+> = 0.2;  
 texture2D BLURTEX(0)    {Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16F;}; 
 sampler2D BLURSAMP(0)   {Texture = BLURTEX(0);};     
 
