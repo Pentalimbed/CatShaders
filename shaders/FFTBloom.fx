@@ -28,13 +28,16 @@ uniform float fMixStrength <
     ui_step = 0.01;
 > = 4.0;
 
-texture2D tex_color_scaled {Width = FFT_TEX_SIZE << 1; Height = FFT_TEX_SIZE; Format = RGBA16F;};
+texture2D tex_color_scaled {Width = FFT_TEX_SIZE; Height = FFT_TEX_SIZE; Format = RGBA16F;};
 storage2D st_color_scaled  {Texture = tex_color_scaled; MipLevel = 0;};
 
 texture2D tex_freq {Width = FFT_TEX_SIZE << 1; Height = FFT_TEX_SIZE; Format = RGBA16F;};
 storage2D st_freq  {Texture = tex_freq; MipLevel = 0;};
 
-texture2D tex_ifft  {Width = FFT_TEX_SIZE << 1; Height = FFT_TEX_SIZE; Format = RGBA16F;};
+texture2D tex_freq_temp {Width = FFT_TEX_SIZE << 1; Height = FFT_TEX_SIZE; Format = RGBA16F;};
+storage2D st_freq_temp  {Texture = tex_freq_temp; MipLevel = 0;};
+
+texture2D tex_ifft  {Width = FFT_TEX_SIZE; Height = FFT_TEX_SIZE; Format = RGBA16F;};
 sampler2D samp_ifft {Texture = tex_ifft;};
 storage2D st_ifft   {Texture = tex_ifft; MipLevel = 0;};
 
@@ -131,7 +134,7 @@ void PS_downscale(
     out float4 color : SV_Target0)
 {
     float2 scale = float2(BUFFER_WIDTH, BUFFER_HEIGHT) / max(BUFFER_WIDTH, BUFFER_HEIGHT);
-    float2 uv_orig = 0.5 + (float2(0.25, 0.5) - uv) / scale * float2(4, 2);
+    float2 uv_orig = 0.5 + (0.5 - uv) / scale * 2;
 
     color = 0;
     [branch]
@@ -144,12 +147,12 @@ void PS_downscale(
 
 void CS_fftHorizontal(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint3 gid : SV_GroupID)
 {
-    fft(st_color_scaled, st_freq, tid.x, gid.x, true, true);
+    fft(st_color_scaled, st_freq_temp, tid.x, gid.x, true, true);
 }
 
 void CS_fftVertical(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint3 gid : SV_GroupID)
 {
-    fft(st_freq, st_freq, tid.x, gid.x, true, false);
+    fft(st_freq_temp, st_freq, tid.x, gid.x, true, false);
 }
 
 void CS_convolution(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint3 gid : SV_GroupID)
@@ -168,12 +171,12 @@ void CS_convolution(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID
 
 void CS_ifftVertical(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint3 gid : SV_GroupID)
 {
-    fft(st_freq, st_freq, tid.x, gid.x, false, false);
+    fft(st_freq, st_freq_temp, tid.x, gid.x, false, false);
 }
 
 void CS_ifftHorizontal(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint3 gid : SV_GroupID)
 {
-    fft(st_freq, st_ifft, tid.x, gid.x, false, true);
+    fft(st_freq_temp, st_ifft, tid.x, gid.x, false, true);
 }
 
 void PS_Display(
@@ -182,7 +185,7 @@ void PS_Display(
 {
     float2 scale = float2(BUFFER_WIDTH, BUFFER_HEIGHT) / max(BUFFER_WIDTH, BUFFER_HEIGHT);
     // 0.5 + (float2(0.25, 0.5) - uv) / scale * float2(4, 2);
-    float2 uv_mapped = float2(0.25, 0.5) - (uv - 0.5) * scale * float2(0.25, 0.5);
+    float2 uv_mapped = 0.5 - (uv - 0.5) * scale * 0.5;
     color = tex2D(ReShade::BackBuffer, uv) + saturate(tex2D(samp_ifft, uv_mapped)) * fMixStrength;
 }
 
