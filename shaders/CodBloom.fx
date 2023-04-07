@@ -34,6 +34,12 @@ sampler2D BLURSAMP(N)   {Texture = BLURTEX(N);};                                
 texture2D BLURUPTEX(N)  {Width = BUFFER_WIDTH >> N; Height = BUFFER_HEIGHT >> N; Format = RGBA16F;}; \
 sampler2D BLURUPSAMP(N) {Texture = BLURUPTEX(N);};
 
+uniform uint iBlendMode <
+	ui_type = "combo";
+    ui_label = "Blend Mode";
+    ui_items = "Add\0Screen\0";
+> = 0;
+
 uniform float fBloomMix <      
     ui_label = "Effect Mix";    
     ui_type = "slider";         
@@ -155,7 +161,10 @@ void PS_Display(
     in float4 vpos : SV_Position, in float2 uv : TEXCOORD0,
     out float4 color : SV_Target0)
 {
-    color = tex2D(ReShade::BackBuffer, uv) + tex2D(BLURUPSAMP(1), uv) * fBloomMix;
+    if(iBlendMode == 0)
+        color = tex2D(ReShade::BackBuffer, uv) + tex2D(BLURUPSAMP(1), uv) * fBloomMix;
+    else
+        color = 1.0 - (1.0 - saturate(tex2D(ReShade::BackBuffer, uv))) * (1.0 - saturate(tex2D(BLURUPSAMP(1), uv) * fBloomMix));
 }
 
 technique CodBloom
