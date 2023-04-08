@@ -1,13 +1,20 @@
 // ref: http://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare
 
 #include "ReShade.fxh"
+#include "linearization/Linearize.fxh"
 
-uniform float fLumaThres <
-    ui_label = "Threshold";
+uniform uint iDebugView <
+	ui_type = "combo";
+    ui_label = "Debug View";
+    ui_items = "None\0Source\0Bloom\0";
+> = 0;
+
+uniform float2 fSoftLumaThres <
+    ui_label = "Soft Luma Threshold";
     ui_type = "slider";
     ui_min = 0.0; ui_max = 1.5;
     ui_step = 0.01;
-> = 0.3;
+> = float2(0.3, 1.0);
 
 uniform float fUpsampleBlurRadius <
     ui_label = "Upsample Blur Radius";
@@ -28,7 +35,7 @@ uniform float BLURMIX(N) <      \
     ui_type = "slider";         \
     ui_min = 0.0; ui_max = 2.0; \
     ui_step = 0.01;             \
-> = 1 / float(8 - N);           \
+> = 1;           \
 texture2D BLURTEX(N)    {Width = BUFFER_WIDTH >> N; Height = BUFFER_HEIGHT >> N; Format = RGBA16F;}; \
 sampler2D BLURSAMP(N)   {Texture = BLURTEX(N);};                                                     \
 texture2D BLURUPTEX(N)  {Width = BUFFER_WIDTH >> N; Height = BUFFER_HEIGHT >> N; Format = RGBA16F;}; \
@@ -38,14 +45,14 @@ uniform uint iBlendMode <
 	ui_type = "combo";
     ui_label = "Blend Mode";
     ui_items = "Add\0Screen\0";
-> = 0;
+> = 1;
 
 uniform float fBloomMix <      
     ui_label = "Effect Mix";    
     ui_type = "slider";         
     ui_min = 0.0; ui_max = 2.0; 
     ui_step = 0.01;             
-> = 0.2;  
+> = 0.4;
 texture2D BLURTEX(0)    {Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16F;}; 
 sampler2D BLURSAMP(0)   {Texture = BLURTEX(0);};     
 
@@ -105,8 +112,8 @@ void PS_ProcessInput(
     in float4 vpos : SV_Position, in float2 uv : TEXCOORD0,
     out float4 color : SV_Target0)
 {
-    color = tex2D(ReShade::BackBuffer, uv);
-    color = luma(color.rgb) > fLumaThres ? color : 0;
+    color = GetBackBuffer(uv);
+    color = lerp(0, color, saturate((luma(color.rgb) - fSoftLumaThres.x) / (fSoftLumaThres.y - fSoftLumaThres.x + 1e-6)));
     color.a = 1;
 }
 
@@ -161,10 +168,21 @@ void PS_Display(
     in float4 vpos : SV_Position, in float2 uv : TEXCOORD0,
     out float4 color : SV_Target0)
 {
-    if(iBlendMode == 0)
-        color = tex2D(ReShade::BackBuffer, uv) + tex2D(BLURUPSAMP(1), uv) * fBloomMix;
-    else
-        color = 1.0 - (1.0 - saturate(tex2D(ReShade::BackBuffer, uv))) * (1.0 - saturate(tex2D(BLURUPSAMP(1), uv) * fBloomMix));
+    if(iDebugView == 0)
+    {
+        float4 back_color = GetBackBuffer(uv);
+        float4 bloom_color = tex2D(BLURUPSAMP(1), uv);
+        if(iBlendMode == 0)
+            color = back_color + bloom_color * fBloomMix;
+        else if(iBlendMode == 1)
+            color = 1 - (1 - saturate(back_color)) * (1 - saturate(bloom_color * fBloomMix));
+    }
+    else if(iDebugView == 1)  // threshold
+        color = tex2D(BLURSAMP(0), uv);
+    else if(iDebugView == 2)  // bloom
+        color = tex2D(BLURUPSAMP(1), uv);
+    
+    color = DisplayBackBuffer(color);
 }
 
 technique CodBloom
@@ -238,5 +256,6 @@ technique CodBloom
     {
         VertexShader = PostProcessVS;
         PixelShader = PS_Display;
+        SRGBWriteEnable = _SRGB;
     }
 }
