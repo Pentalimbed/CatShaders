@@ -1,7 +1,7 @@
 // ref: http://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare
 
 #include "ReShade.fxh"
-#include "linearization/Linearize.fxh"
+#include "extern/linearization/Linearize.fxh"
 
 uniform uint iDebugView <
 	ui_type = "combo";
