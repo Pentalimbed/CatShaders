@@ -119,7 +119,6 @@ void fft(storage2D st_source, storage2D st_target, uint thread_id, uint group_id
     [branch]
     if(is_forward || !is_horizontal)
     {
-        barrier();
         tex2Dstore(st_target, px_rg, float4(outputs[0], outputs[1]));
         tex2Dstore(st_target, px_ba, float4(outputs[2], 1, 1));
     }
