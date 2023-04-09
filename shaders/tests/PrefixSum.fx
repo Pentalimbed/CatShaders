@@ -19,7 +19,6 @@ sampler2D samp_prefixsum_2 {Texture = tex_prefixsum_2;};
 #endif
 
 // chain+Kogge-Stone+chain sum on one dimension
-// source and target are transposed 
 groupshared uint4 shared_buffer[PREFIX_SUM_NTHREADS];
 void prefixSumNaive(storage2D st_source, storage2D st_target, uint gid, uint tid, bool row_wise, bool transpose)
 {
