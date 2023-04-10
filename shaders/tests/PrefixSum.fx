@@ -18,6 +18,9 @@ sampler2D samp_prefixsum_2 {Texture = tex_prefixsum_2;};
 #   define CACHE_LEN ((BUFFER_HEIGHT - 1) / PREFIX_SUM_NTHREADS + 1)
 #endif
 
+namespace PrefixSum
+{
+
 // chain+Kogge-Stone+chain sum on one dimension
 groupshared uint4 shared_buffer[PREFIX_SUM_NTHREADS];
 void prefixSumNaive(storage2D st_source, storage2D st_target, uint gid, uint tid, bool row_wise, bool transpose)
@@ -117,4 +120,5 @@ technique TestPrefixSum
         VertexShader = PostProcessVS;
         PixelShader = PS_Display;
     }
+}
 }

@@ -15,7 +15,8 @@
 
 #define NBINS 6
 
-
+namespace MSHIST
+{
 
 uniform float fFrameTime < source = "frametime"; >;
 
@@ -457,4 +458,6 @@ technique MSHIST
         DispatchSizeX = 1;
 		DispatchSizeY = 1;
     }
+}
+
 }
