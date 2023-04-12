@@ -8,6 +8,8 @@
 
 #include "ReShade.fxh"
 
+namespace FFTBloom
+{
 static const float PI = 3.141592653589793238462643383279;
 
 uniform float fLowPassFreq <
@@ -231,4 +233,5 @@ technique FFTBloom
         VertexShader = PostProcessVS;
         PixelShader = PS_Display;
     }
+}
 }

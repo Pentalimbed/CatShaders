@@ -63,7 +63,7 @@ uniform float fLinearBias <
 
 // ----- Adaptation ----- //
 
-uniform float2 fAdaptAreaSize<
+uniform float2 fAdaptAreaSize <
     ui_category = "Adaptation";
     ui_label = "Adaptation Area Size";
     ui_type = "slider";
@@ -71,13 +71,13 @@ uniform float2 fAdaptAreaSize<
     ui_step = 0.01;
 > = float2(1.0, 1.0);
 
-uniform float2 fAdaptAreaOffset<
+uniform float2 fAdaptAreaOffset <
     ui_category = "Adaptation";
     ui_label = "Adaptation Area Offset";
     ui_type = "slider";
     ui_min = -0.5; ui_max = 0.5;
     ui_step = 0.01;
-> = float2(0, 0.0);
+> = float2(0.0, 0.0);
 
 uniform float fTargetMaxBinMul <
     ui_category = "Adaptation";
