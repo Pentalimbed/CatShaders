@@ -3,7 +3,29 @@
     tizian/tonemapper
         url:    https://github.com/tizian/tonemapper
         credit: plenty o' mapping functions
-    How to compute log with the preprocessor
+        license:
+            The MIT License (MIT)
+
+            Copyright (c) 2022 Tizian Zeltner
+
+            Permission is hereby granted, free of charge, to any person obtaining a copy
+            of this software and associated documentation files (the "Software"), to deal
+            in the Software without restriction, including without limitation the rights
+            to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+            copies of the Software, and to permit persons to whom the Software is
+            furnished to do so, subject to the following conditions:
+
+            The above copyright notice and this permission notice shall be included in all
+            copies or substantial portions of the Software.
+
+            THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+            IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+            FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+            AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+            LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+            OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+            SOFTWARE.
+    How to compute log with the preprocessor.
         url:    https://stackoverflow.com/questions/27581671/how-to-compute-log-with-the-preprocessor
         credit: LOG macro
 
@@ -72,9 +94,11 @@
     0 - Gamma Only
     1 - Reinhard => Reinhard et al. Photographic Tone Reproduction for Digital Images.
     2 - Reinhard Extended => Reinhard et al. Photographic Tone Reproduction for Digital Images.
-    3 - Uncharted 2 => John Hable. Filmic Tonemapping for Real-time Rendering.
+    3 - Uncharted 2 Filimic => John Hable. Filmic Tonemapping for Real-time Rendering.
     4 - Hejl Burgess-Dawson Filmic => Jim Hejl and Richard Burgess-Dawson. Filmic Tonemapping for Real-time Rendering.
-    ACES
+    5 - ACES Hill fit => Stephen Hill. https://github.com/TheRealMJP/BakingLab/blob/master/BakingLab/ACES.hlsl
+    6 - ACES Narkowicz fit => Krzysztof Narkowicz. https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
+    7 - ACES Guy fit => Romain Guy. https://www.shadertoy.com/view/llXyWr
     photoreceptor => Dunn et al. Light adaptation in cone vision involves switching between receptor and post-receptor sites.
 */
 #if CATTONE_TONEMAPPER == 0
@@ -92,25 +116,47 @@
 #   define TONEMAPPER_NAME "Reinhard Extended"
 #elif CATTONE_TONEMAPPER == 3
 #   define PARAM_KEYVAL
-// #   define PARAM_WHITEPOINT
 #   define TONEMAP uncharted
 #   define TONEMAPPER_NAME "Filmic (Hable 2010 / Uncharted 2)"
 #elif CATTONE_TONEMAPPER == 4
 #   define PARAM_KEYVAL
 #   define TONEMAP hejlBurgessDawsonFilmic
-#   define TONEMAPPER_NAME "Filmic (Hejl Burgess-Dawson)"
+#   define TONEMAPPER_NAME "Filmic (Hejl Burgess-Dawson)\n- don't need gamma"
+#elif CATTONE_TONEMAPPER == 5
+#   define PARAM_KEYVAL
+#   define TONEMAP acesHill
+#   define TONEMAPPER_NAME "ACES (Hill)\n- don't need gamma\n- set CATTONE_PER_CHANNEL_MAP to 1"
+#elif CATTONE_TONEMAPPER == 6
+#   define PARAM_KEYVAL
+#   define TONEMAP acesNarkowicz
+#   define TONEMAPPER_NAME "ACES (Narkowicz)"
+#elif CATTONE_TONEMAPPER == 7
+#   define PARAM_KEYVAL
+#   define TONEMAP acesGuy
+#   define TONEMAPPER_NAME "ACES (Guy)\n- don't need gamma"
 #else
 #   error CATTONE_ERRMSG(CATTONE_TONEMAPPER)
 #endif
 
 
 #ifndef CATTONE_PER_CHANNEL_MAP
-#   define CATTONE_PER_CHANNEL_MAP 0
+#   define CATTONE_PER_CHANNEL_MAP 1
 #endif
 
 
 namespace CatTonemap
 {
+
+static const float3x3 g_sRGBToACEScg = float3x3(
+    0.613117812906440,  0.341181995855625,  0.045787344282337,
+    0.069934082307513,  0.918103037508582,  0.011932775530201,
+    0.020462992637737,  0.106768663382511,  0.872715910619442
+);
+static const float3x3 g_ACEScgToSRGB = float3x3(
+    1.704887331049502,  -0.624157274479025, -0.080886773895704,
+    -0.129520935348888,  1.138399326040076, -0.008779241755018,
+    -0.024127059936902, -0.124620612286390,  1.148822109913262
+);
 
 uniform float fFrameTime < source = "frametime"; >;
 
@@ -141,7 +187,7 @@ uniform float2 fOutputRange <
     ui_type = "slider";
     ui_min = 0.0; ui_max = 1.0;
     ui_step = 0.01;
-> = float2(0.0, 1.0);
+> = float2(0.0, 1.5);
 
 uniform float fAdaptSpeed <
     ui_category = "Adaptation";
@@ -172,7 +218,7 @@ uniform float fKeyValue <
     ui_category = "Tonemapping";
     ui_label = "Key Value / Exposure";
     ui_type = "slider";
-    ui_min = 0.0; ui_max = 3.0;
+    ui_min = 0.0; ui_max = 2.0;
     ui_step = 0.01;
 > = 0.25;
 #endif
@@ -249,7 +295,7 @@ float3 reinhardExt(float3 val, float3 avg_val)
 
 float3 hejlBurgessDawsonFilmic(float3 val, float3 avg_val)
 {
-    val = keyValAdapt(val, avg_val);
+    val = keyValAdapt(val, avg_val) * 0.2;  // 0.2 is manual adjustment
     val = max(0, val - 0.004);
     val = (val * (6.2 * val + .5)) / (val * (6.2 * val + 1.7) + 0.06);
     return val;
@@ -271,6 +317,40 @@ float3 uncharted(float3 val, float3 avg_val)
     val = keyValAdapt(val, avg_val);
     val = unchartedHelper(val);
     val /= unchartedHelper(11.2);
+    return val;
+}
+
+float3 acesHill(float3 val, float3 avg_val)
+{
+    val = keyValAdapt(val, avg_val);
+    val = mul(g_sRGBToACEScg, val);
+    float3 a = val * (val + 0.0245786f) - 0.000090537f;
+    float3 b = val * (0.983729f * val + 0.4329510f) + 0.238081f;
+    val = a / b;
+    val = mul(g_ACEScgToSRGB, val);
+    val = saturate(val);
+    return val;
+}
+
+float3 acesNarkowicz(float3 val, float3 avg_val)
+{
+    val = keyValAdapt(val, avg_val);
+
+    static const float A = 2.51;
+    static const float B = 0.03;
+    static const float C = 2.43;
+    static const float D = 0.59;
+    static const float E = 0.14;
+    val *= 0.6;
+    val = (val * (A * val + B)) / (val * (C * val + D) + E);
+
+    return val;
+}
+
+float3 acesGuy(float3 val, float3 avg_val)
+{
+    val = keyValAdapt(val, avg_val) * 0.2;  // 0.2 is manual adjustment
+    val = val / (val + 0.155f) * 1.019;
     return val;
 }
 #endif
@@ -306,7 +386,7 @@ void PS_Tonemap(
     float val = VALUE_FUNC(color);
 
 #if CATTONE_PER_CHANNEL_MAP
-    float3 mapped_color = TONEMAP(color, avg_val);
+    float3 mapped_color = TONEMAP(color.rgb, avg_val);
 #else 
     float mapped_val = TONEMAP(val, avg_val);
     float3 mapped_color = pow(abs(color.rgb / val), fSatPower) * mapped_val;
