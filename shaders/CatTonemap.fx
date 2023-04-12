@@ -88,7 +88,7 @@
 
 
 #ifndef CATTONE_TONEMAPPER
-#   define CATTONE_TONEMAPPER 2
+#   define CATTONE_TONEMAPPER 5
 #endif
 /*
     0 - Gamma Only
@@ -162,7 +162,7 @@ uniform float fFrameTime < source = "frametime"; >;
 
 uniform bool bDisplayInterestArea <
     ui_category = "IO";
-    ui_label = "Display Interest Area (Colored)";
+    ui_label = "Display Interest Area";
 > = false;
 
 uniform float2 fAreaSize <
@@ -295,7 +295,7 @@ float3 reinhardExt(float3 val, float3 avg_val)
 
 float3 hejlBurgessDawsonFilmic(float3 val, float3 avg_val)
 {
-    val = keyValAdapt(val, avg_val) * 0.2;  // 0.2 is manual adjustment
+    val = keyValAdapt(val, avg_val) * 0.1;  // 0.1 is manual adjustment
     val = max(0, val - 0.004);
     val = (val * (6.2 * val + .5)) / (val * (6.2 * val + 1.7) + 0.06);
     return val;
