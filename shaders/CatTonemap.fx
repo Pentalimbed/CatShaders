@@ -59,34 +59,55 @@
 #elif CATTONE_VALUE_FUNC == 1
 #   define VALUE_FUNC(color) length(color.rgb);
 #elif CATTONE_VALUE_FUNC == 2
-#   define VALUE_FUNC(color) max(color.r, color.g, color.b);
+#   define VALUE_FUNC(color) max(color.r, max(color.g, color.b));
 #else
 #   error CATTONE_ERRMSG(CATTONE_VALUE_FUNC)
 #endif
 
 
 #ifndef CATTONE_TONEMAPPER
-#   define CATTONE_TONEMAPPER 1
+#   define CATTONE_TONEMAPPER 2
 #endif
 /*
-    0 - Reinhard => Reinhard et al. Photographic Tone Reproduction for Digital Images.
-    1 - Reinhard Extended => Reinhard et al. Photographic Tone Reproduction for Digital Images.
-    2 - filmic
+    0 - Gamma Only
+    1 - Reinhard => Reinhard et al. Photographic Tone Reproduction for Digital Images.
+    2 - Reinhard Extended => Reinhard et al. Photographic Tone Reproduction for Digital Images.
+    3 - Uncharted 2 => John Hable. Filmic Tonemapping for Real-time Rendering.
+    4 - Hejl Burgess-Dawson Filmic => Jim Hejl and Richard Burgess-Dawson. Filmic Tonemapping for Real-time Rendering.
     ACES
     photoreceptor => Dunn et al. Light adaptation in cone vision involves switching between receptor and post-receptor sites.
 */
 #if CATTONE_TONEMAPPER == 0
 #   define PARAM_KEYVAL
+#   define TONEMAP keyValAdapt
+#   define TONEMAPPER_NAME "Gamma Only"
+#elif CATTONE_TONEMAPPER == 1
+#   define PARAM_KEYVAL
 #   define TONEMAP reinhard
 #   define TONEMAPPER_NAME "Reinhard"
-#elif CATTONE_TONEMAPPER == 1
+#elif CATTONE_TONEMAPPER == 2
 #   define PARAM_KEYVAL
 #   define PARAM_WHITEPOINT
 #   define TONEMAP reinhardExt
 #   define TONEMAPPER_NAME "Reinhard Extended"
+#elif CATTONE_TONEMAPPER == 3
+#   define PARAM_KEYVAL
+// #   define PARAM_WHITEPOINT
+#   define TONEMAP uncharted
+#   define TONEMAPPER_NAME "Filmic (Hable 2010 / Uncharted 2)"
+#elif CATTONE_TONEMAPPER == 4
+#   define PARAM_KEYVAL
+#   define TONEMAP hejlBurgessDawsonFilmic
+#   define TONEMAPPER_NAME "Filmic (Hejl Burgess-Dawson)"
 #else
 #   error CATTONE_ERRMSG(CATTONE_TONEMAPPER)
 #endif
+
+
+#ifndef CATTONE_PER_CHANNEL_MAP
+#   define CATTONE_PER_CHANNEL_MAP 0
+#endif
+
 
 namespace CatTonemap
 {
@@ -149,9 +170,9 @@ uniform int iTonemapDisplay <
 #ifdef PARAM_KEYVAL
 uniform float fKeyValue <
     ui_category = "Tonemapping";
-    ui_label = "Key Value";
+    ui_label = "Key Value / Exposure";
     ui_type = "slider";
-    ui_min = 0.0; ui_max = 1.0;
+    ui_min = 0.0; ui_max = 3.0;
     ui_step = 0.01;
 > = 0.25;
 #endif
@@ -166,11 +187,21 @@ uniform float fWhitePoint <
 > = 2.0;
 #endif
 
+#if CATTONE_PER_CHANNEL_MAP == 0
 uniform float fSatPower <
     ui_category = "Tonemapping";
     ui_label = "Saturation Power";
     ui_type = "slider";
     ui_min = 0.0; ui_max = 2.0;
+    ui_step = 0.01;
+> = 1.0;
+#endif
+
+uniform float fPostGamma <
+    ui_category = "Tonemapping";
+    ui_label = "Post Gamma";
+    ui_type = "slider";
+    ui_min = 0.0; ui_max = 3.0;
     ui_step = 0.01;
 > = 1.0;
 
@@ -195,18 +226,53 @@ float rgbLuminance(float3 rgb)
 }
 
 #ifdef PARAM_KEYVAL
-float reinhard(float val, float avg_val)
+float3 keyValAdapt(float3 val, float3 avg_val)
 {
     return fKeyValue * val / avg_val;
 }
 
-#ifdef PARAM_WHITEPOINT
-float reinhardExt(float val, float avg_val)
+float3 reinhard(float3 val, float3 avg_val)
 {
-    val = reinhard(val, avg_val);
-    return val * (1 + val / (fWhitePoint * fWhitePoint)) / (1 + val);
+    val = keyValAdapt(val, avg_val);
+    val = val / (1 + val);
+    return val;
+}
+
+#ifdef PARAM_WHITEPOINT
+float3 reinhardExt(float3 val, float3 avg_val)
+{
+    val = keyValAdapt(val, avg_val);
+    val = val * (1 + val / (fWhitePoint * fWhitePoint)) / (1 + val);
+    return val;
 }
 #endif
+
+float3 hejlBurgessDawsonFilmic(float3 val, float3 avg_val)
+{
+    val = keyValAdapt(val, avg_val);
+    val = max(0, val - 0.004);
+    val = (val * (6.2 * val + .5)) / (val * (6.2 * val + 1.7) + 0.06);
+    return val;
+}
+
+float3 unchartedHelper(float3 x)
+{
+    static const float A = 0.15;
+    static const float B = 0.50;
+    static const float C = 0.10;
+    static const float D = 0.20;
+    static const float E = 0.02;
+    static const float F = 0.30;
+    return ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
+}
+
+float3 uncharted(float3 val, float3 avg_val)
+{
+    val = keyValAdapt(val, avg_val);
+    val = unchartedHelper(val);
+    val /= unchartedHelper(11.2);
+    return val;
+}
 #endif
 
 void PS_PrepareInput(
@@ -238,9 +304,15 @@ void PS_Tonemap(
     
     float avg_val = tex2Dfetch(samp_avg_val, uint2(0, 0)).x;
     float val = VALUE_FUNC(color);
-    float mapped_val = TONEMAP(val, avg_val);
 
+#if CATTONE_PER_CHANNEL_MAP
+    float3 mapped_color = TONEMAP(color, avg_val);
+#else 
+    float mapped_val = TONEMAP(val, avg_val);
     float3 mapped_color = pow(abs(color.rgb / val), fSatPower) * mapped_val;
+#endif
+
+    mapped_color = pow(abs(mapped_color), rcp(fPostGamma));
 
     out_color = lerp(fOutputRange.x, fOutputRange.y, saturate(mapped_color));
     out_color = DisplayBackBuffer(out_color);
@@ -248,7 +320,7 @@ void PS_Tonemap(
     if(bDisplayInterestArea)
     {
         float2 uv_center = 0.5 + fAreaOffset;
-        if(!all(abs(uv - uv_center) < fAreaSize * 0.5))
+        if(all(abs(uv - uv_center) < fAreaSize * 0.5))
             out_color = val;
     }
 }
