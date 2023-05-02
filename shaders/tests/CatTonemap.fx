@@ -116,6 +116,7 @@
 #   define TONEMAPPER_NAME "Reinhard Extended"
 #elif CATTONE_TONEMAPPER == 3
 #   define PARAM_KEYVAL
+#   define PARAM_UNCHARTED
 #   define TONEMAP uncharted
 #   define TONEMAPPER_NAME "Filmic (Hable 2010 / Uncharted 2)"
 #elif CATTONE_TONEMAPPER == 4
@@ -233,6 +234,64 @@ uniform float fWhitePoint <
 > = 2.0;
 #endif
 
+#ifdef PARAM_UNCHARTED
+uniform float fUnchartedA <
+    ui_category = "Tonemapping";
+    ui_label = "A";
+    ui_type = "slider";
+    ui_min = 0.01; ui_max = 1.0;
+    ui_step = 0.01;
+> = 0.15;
+
+uniform float fUnchartedB <
+    ui_category = "Tonemapping";
+    ui_label = "B";
+    ui_type = "slider";
+    ui_min = 0.01; ui_max = 1.0;
+    ui_step = 0.01;
+> = 0.50;
+
+uniform float fUnchartedC <
+    ui_category = "Tonemapping";
+    ui_label = "C";
+    ui_type = "slider";
+    ui_min = 0.01; ui_max = 1.0;
+    ui_step = 0.01;
+> = 0.10;
+
+uniform float fUnchartedD <
+    ui_category = "Tonemapping";
+    ui_label = "D";
+    ui_type = "slider";
+    ui_min = 0.01; ui_max = 1.0;
+    ui_step = 0.01;
+> = 0.20;
+
+uniform float fUnchartedE <
+    ui_category = "Tonemapping";
+    ui_label = "E";
+    ui_type = "slider";
+    ui_min = 0.01; ui_max = 1.0;
+    ui_step = 0.01;
+> = 0.02;
+
+uniform float fUnchartedF <
+    ui_category = "Tonemapping";
+    ui_label = "F";
+    ui_type = "slider";
+    ui_min = 0.01; ui_max = 1.0;
+    ui_step = 0.01;
+> = 0.30;
+
+uniform float fUnchartedW <
+    ui_category = "Tonemapping";
+    ui_label = "W";
+    ui_type = "slider";
+    ui_min = 0.01; ui_max = 20.0;
+    ui_step = 0.01;
+> = 11.2;
+#endif
+
 #if CATTONE_PER_CHANNEL_MAP == 0
 uniform float fSatPower <
     ui_category = "Tonemapping";
@@ -301,24 +360,22 @@ float3 hejlBurgessDawsonFilmic(float3 val, float3 avg_val)
     return val;
 }
 
+#ifdef PARAM_UNCHARTED
 float3 unchartedHelper(float3 x)
 {
-    static const float A = 0.15;
-    static const float B = 0.50;
-    static const float C = 0.10;
-    static const float D = 0.20;
-    static const float E = 0.02;
-    static const float F = 0.30;
-    return ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
+    return ((x * (fUnchartedA * x+ fUnchartedC * fUnchartedB) + fUnchartedD * fUnchartedE) / 
+            (x * (fUnchartedA * x + fUnchartedB) + fUnchartedD * fUnchartedF))
+            - fUnchartedE / fUnchartedF;
 }
 
 float3 uncharted(float3 val, float3 avg_val)
 {
     val = keyValAdapt(val, avg_val);
     val = unchartedHelper(val);
-    val /= unchartedHelper(11.2);
+    val /= unchartedHelper(fUnchartedW);
     return val;
 }
+#endif
 
 float3 acesHill(float3 val, float3 avg_val)
 {
@@ -395,7 +452,7 @@ void PS_Tonemap(
     mapped_color = pow(abs(mapped_color), rcp(fPostGamma));
 
     out_color = lerp(fOutputRange.x, fOutputRange.y, saturate(mapped_color));
-    out_color = DisplayBackBuffer(out_color);
+    // out_color = DisplayBackBuffer(out_color);
 
     if(bDisplayInterestArea)
     {
