@@ -1,5 +1,6 @@
 /*
     Edge-aware filter based on adaptive patch variance weighted average
+    https://ieeexplore.ieee.org/ielx7/6287639/6514899/09521149.pdf
 */
 
 #include "ReShade.fxh"
